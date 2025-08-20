@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Fraud Detection Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="header-content">
+                <h1><i class="fas fa-shield-alt"></i> Real-time Fraud Detection Dashboard</h1>
+                <div class="header-controls">
+                    <div class="status-indicator" id="connection-status">
+                        <i class="fas fa-circle"></i> Connecting...
+                    </div>
+                    <button id="start-monitoring" class="btn btn-primary">
+                        <i class="fas fa-play"></i> Start Monitoring
+                    </button>
+                    <button id="stop-monitoring" class="btn btn-secondary" style="display: none;">
+                        <i class="fas fa-stop"></i> Stop Monitoring
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Statistics Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-credit-card"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number" id="total-transactions">0</div>
+                    <div class="stat-label">Total Transactions</div>
+                </div>
+            </div>
+            
+            <div class="stat-card fraud">
+                <div class="stat-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number" id="fraud-detected">0</div>
+                    <div class="stat-label">Fraud Detected</div>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-dollar-sign"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number" id="total-amount">$0</div>
+                    <div class="stat-label">Total Amount</div>
+                </div>
+            </div>
+            
+            <div class="stat-card fraud">
+                <div class="stat-icon">
+                    <i class="fas fa-hand-paper"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number" id="blocked-amount">$0</div>
+                    <div class="stat-label">Blocked Amount</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="charts-grid">
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h3>Fraud Detection Over Time</h3>
+                </div>
+                <canvas id="fraud-trend-chart"></canvas>
+            </div>
+            
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h3>Transaction Distribution</h3>
+                </div>
+                <canvas id="transaction-distribution-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- Real-time Data Section -->
+        <div class="data-grid">
+            <!-- Recent Transactions -->
+            <div class="data-panel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-list"></i> Recent Transactions</h3>
+                    <div class="panel-controls">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="fraud-only-toggle">
+                            <span class="slider"></span>
+                            <span class="toggle-label">Fraud Only</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="panel-content">
+                    <div class="table-container">
+                        <table id="transactions-table">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Amount</th>
+                                    <th>Merchant</th>
+                                    <th>User</th>
+                                    <th>Score</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactions-body">
+                                <tr class="no-data">
+                                    <td colspan="6">No transactions yet. Start monitoring to see real-time data.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fraud Alerts -->
+            <div class="data-panel alerts-panel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-bell"></i> Fraud Alerts</h3>
+                    <div class="alert-count" id="alert-count">0</div>
+                </div>
+                <div class="panel-content">
+                    <div id="alerts-container">
+                        <div class="no-alerts">
+                            <i class="fas fa-shield-alt"></i>
+                            <p>No fraud alerts</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="dashboard-footer">
+            <div class="footer-content">
+                <p>Real-time Fraud Detection System | Last Updated: <span id="last-updated">Never</span></p>
+                <div class="tech-info">
+                    <span>WebSocket: <span id="websocket-status">Disconnected</span></span>
+                    <span>Splunk Logging: <span class="enabled">Enabled</span></span>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Fraud Alert Modal -->
+    <div id="fraud-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-exclamation-triangle"></i> Fraud Alert</h2>
+                <span class="close-modal">&times;</span>
+            </div>
+            <div class="modal-body" id="fraud-modal-body">
+                <!-- Fraud alert details will be populated here -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeModal()">Acknowledge</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include JavaScript -->
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>
